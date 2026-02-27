@@ -329,7 +329,7 @@ export default function App() {
       try {
         setLoading(true);
         setError("");
-        const response = await axios.get("/statuses");
+        const response = await axios.get("https://proaristocratic-surgeonless-miya.ngrok-free.dev/statuses");
         setPhotos(normalizePhotos(response.data));
       } catch (err) {
         setError("Could not load photos. Please try again.");
