@@ -110,13 +110,15 @@ function DownloadButton({ url, className = "", isDarkMode = false }) {
     <button
       type="button"
       onClick={handleDownload}
-      className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+      aria-label="Download photo"
+      title="Download"
+      className={`inline-flex items-center justify-center border-2 p-2 transition ${
         isDarkMode
           ? "border-[#cfcfcf] bg-[#cfcfcf] text-[#2a2a2a] hover:bg-transparent hover:text-[#e9e9e9]"
           : "border-black bg-black text-white hover:bg-white hover:text-black"
       } ${className}`}
     >
-      Download
+      <DownloadIcon className="h-4 w-4" />
     </button>
   );
 }
@@ -233,17 +235,53 @@ function SunIcon({ className = "" }) {
   );
 }
 
+function DownloadIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        d="M12 4v10m0 0-4-4m4 4 4-4M5 18h14"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function TrashIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        d="M4 7h16M9 7V5h6v2m-7 0 1 12h6l1-12"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
 function PhotoActionButton({
   children,
   onClick,
   className = "",
   type = "button",
+  ariaLabel = "",
+  title = "",
+  disabled = false,
 }) {
   return (
     <button
       type={type}
       onClick={onClick}
-      className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${className}`}
+      aria-label={ariaLabel || undefined}
+      title={title || undefined}
+      disabled={disabled}
+      className={`inline-flex items-center justify-center border-2 p-2 text-xs font-semibold uppercase tracking-wide transition disabled:cursor-not-allowed disabled:opacity-40 ${className}`}
     >
       {children}
     </button>
@@ -276,8 +314,10 @@ function PhotoCard({ photo, onClick, onDelete, isDarkMode }) {
               ? "border-red-300 bg-red-300 text-[#2a2a2a] hover:bg-transparent hover:text-red-200"
               : "border-red-700 bg-red-700 text-white hover:bg-white hover:text-red-700"
           }
+          ariaLabel="Delete photo"
+          title="Delete"
         >
-          Delete
+          <TrashIcon className="h-4 w-4" />
         </PhotoActionButton>
       </div>
     </button>
@@ -309,6 +349,9 @@ function PhotoGrid({ photos, emptyMessage, onPhotoClick, onDeletePhoto, isDarkMo
 }
 
 function FolderCard({ name, count, onClick, isDarkMode }) {
+  const symbols = ["*", "#", "%", "&", "$", "@", "+"];
+  const randomSymbol = symbols[Math.floor(Math.random() * symbols.length)];
+
   return (
     <button
       onClick={onClick}
@@ -319,7 +362,9 @@ function FolderCard({ name, count, onClick, isDarkMode }) {
       }`}
       type="button"
     >
-      <div className="mb-4 h-12 w-12 rounded-full border-2 border-current" />
+      <div className="mb-4 flex h-12 w-12 items-center justify-center rounded-full border-2 border-current text-sm font-bold">
+        {randomSymbol}
+      </div>
       <h3 className="text-lg font-semibold">{name}</h3>
       <p className={`mt-1 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}>
         {count} photo{count !== 1 ? "s" : ""}
@@ -337,6 +382,7 @@ function FolderCard({ name, count, onClick, isDarkMode }) {
 export default function App() {
   const [photos, setPhotos] = useState([]);
   const [folders, setFolders] = useState([]);
+  const [folderPhotoCounts, setFolderPhotoCounts] = useState({});
   const [activeTab, setActiveTab] = useState(TABS.ALL_PHOTOS);
   const [selectedFolder, setSelectedFolder] = useState(null);
   const [selectedFolderPhotos, setSelectedFolderPhotos] = useState([]);
@@ -347,6 +393,8 @@ export default function App() {
   const [successMessage, setSuccessMessage] = useState("");
   const [activePhoto, setActivePhoto] = useState(null);
   const [deletingPhotoId, setDeletingPhotoId] = useState("");
+  const [isCreateFolderModalOpen, setIsCreateFolderModalOpen] = useState(false);
+  const [newFolderName, setNewFolderName] = useState("");
   const transitionTimeoutRef = useRef(null);
   const successTimeoutRef = useRef(null);
   const popStateRef = useRef(false);
@@ -391,17 +439,34 @@ export default function App() {
     }
   }
 
-  async function uploadFiles(files, endpoint) {
+  async function uploadFiles(files, endpoints) {
     const imageFiles = files.filter((file) => file.type.startsWith("image/"));
     if (!imageFiles.length) {
       setError("Please select image files only.");
       return;
     }
 
+    const endpointList = Array.isArray(endpoints) ? endpoints : [endpoints];
+
     for (const file of imageFiles) {
-      const formData = new FormData();
-      formData.append("file", file);
-      await axios.post(endpoint, formData);
+      let uploadError = null;
+
+      for (const endpoint of endpointList) {
+        const formData = new FormData();
+        formData.append("file", file);
+
+        try {
+          await axios.post(endpoint, formData);
+          uploadError = null;
+          break;
+        } catch (err) {
+          uploadError = err;
+        }
+      }
+
+      if (uploadError) {
+        throw uploadError;
+      }
     }
   }
 
@@ -413,12 +478,40 @@ export default function App() {
 
   async function fetchFolders() {
     const response = await axios.get("/folder");
-    const folderNames = Array.isArray(response.data)
-      ? response.data
-          .map((item) => item?.folderName)
-          .filter((folderName) => typeof folderName === "string")
-      : [];
-    setFolders(Array.from(new Set(folderNames)));
+    const folderNames = [];
+    const nextCounts = {};
+
+    if (Array.isArray(response.data)) {
+      response.data.forEach((item) => {
+        const rawName =
+          typeof item === "string" ? item : typeof item?.folderName === "string" ? item.folderName : "";
+        const folderName = rawName.trim();
+
+        if (!folderName) {
+          return;
+        }
+
+        folderNames.push(folderName);
+
+        const parsedCount = Number(
+          typeof item === "string" ? Number.NaN : item?.photoCount,
+        );
+        if (Number.isFinite(parsedCount) && parsedCount >= 0) {
+          nextCounts[folderName] = parsedCount;
+        }
+      });
+    }
+
+    setFolders((previous) => Array.from(new Set([...previous, ...folderNames])));
+    setFolderPhotoCounts((previous) => {
+      const merged = { ...previous, ...nextCounts };
+      folderNames.forEach((name) => {
+        if (!(name in merged)) {
+          merged[name] = 0;
+        }
+      });
+      return merged;
+    });
   }
 
   async function fetchFolderPhotos(folderName) {
@@ -479,7 +572,7 @@ export default function App() {
       setViewLoading(true);
       setError("");
       setSuccessMessage("");
-      await uploadFiles(files, "/api/upload");
+      await uploadFiles(files, ["/api/upload", "/upload"]);
       await Promise.all([fetchAllPhotos(), fetchFolders()]);
       showUploadSuccess("Your photos were uploaded.");
     } catch (err) {
@@ -509,7 +602,7 @@ export default function App() {
       setError("");
       setSuccessMessage("");
       const encodedFolder = encodeURIComponent(selectedFolder);
-      await uploadFiles(files, `/api/upload/${encodedFolder}`);
+      await uploadFiles(files, [`/api/upload/${encodedFolder}`, `/upload/${encodedFolder}`]);
       await Promise.all([
         fetchAllPhotos(),
         fetchFolderPhotos(selectedFolder),
@@ -527,10 +620,21 @@ export default function App() {
   }
 
   function handleCreateFolder() {
-    const folderName = window.prompt("Enter new folder name:");
-    const trimmedName = folderName?.trim();
+    setNewFolderName("");
+    setError("");
+    setIsCreateFolderModalOpen(true);
+  }
+
+  function closeCreateFolderModal() {
+    setIsCreateFolderModalOpen(false);
+    setNewFolderName("");
+  }
+
+  function submitCreateFolder() {
+    const trimmedName = newFolderName.trim();
 
     if (!trimmedName) {
+      setError("Please enter a folder name.");
       return;
     }
 
@@ -540,6 +644,16 @@ export default function App() {
       }
       return [...previous, trimmedName];
     });
+    setFolderPhotoCounts((previous) => ({
+      ...previous,
+      [trimmedName]: previous[trimmedName] ?? 0,
+    }));
+
+    setActiveTab(TABS.FOLDERS);
+    setSelectedFolder(trimmedName);
+    setSelectedFolderPhotos([]);
+    setError("");
+    closeCreateFolderModal();
   }
 
   async function handleFoldersTabClick() {
@@ -650,21 +764,21 @@ export default function App() {
   }, [activeTab, selectedFolder]);
 
   const folderCounts = useMemo(() => {
-    const counts = photos.reduce((acc, photo) => {
+    const counts = { ...folderPhotoCounts };
+    photos.forEach((photo) => {
       const folderName = typeof photo.folder === "string" ? photo.folder.trim() : "";
-      if (!folderName) {
-        return acc;
+      if (!folderName || folderName in counts) {
+        return;
       }
-      acc[folderName] = (acc[folderName] || 0) + 1;
-      return acc;
-    }, {});
+      counts[folderName] = 0;
+    });
     folders.forEach((folderName) => {
       if (!(folderName in counts)) {
         counts[folderName] = 0;
       }
     });
     return counts;
-  }, [photos, folders]);
+  }, [folderPhotoCounts, photos, folders]);
 
   const filteredAllPhotos = useMemo(() => photos, [photos]);
 
@@ -834,7 +948,7 @@ export default function App() {
                         setSelectedFolder(null);
                       });
                     }}
-                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                       isDarkMode
                         ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                         : "border-black bg-black text-white"
@@ -849,7 +963,7 @@ export default function App() {
                   <button
                     type="button"
                     onClick={handleCreateFolder}
-                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                       isDarkMode
                         ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                         : "border-black bg-black text-white"
@@ -874,7 +988,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleFolderUploadClick}
-                      className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                         isDarkMode
                           ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                           : "border-black bg-black text-white"
@@ -924,8 +1038,71 @@ export default function App() {
             </div>
           ) : null}
         </section>
-      </main>
+      </main>
+      {isCreateFolderModalOpen ? (
+        <div
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4"
+          onClick={closeCreateFolderModal}
+        >
+          <div
+            className={`w-full max-w-md border-2 p-6 ${
+              isDarkMode ? "border-[#cfcfcf] bg-[#333333] text-[#f2f2f2]" : "border-black bg-white text-black"
+            }`}
+            onClick={(event) => event.stopPropagation()}
+          >
+            <h3 className="text-xl font-semibold">Create New Folder</h3>
+            <p className={`mt-2 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}>
+              Enter a folder name to continue.
+            </p>
 
+            <input
+              type="text"
+              value={newFolderName}
+              onChange={(event) => setNewFolderName(event.target.value)}
+              onKeyDown={(event) => {
+                if (event.key === "Enter") {
+                  submitCreateFolder();
+                }
+                if (event.key === "Escape") {
+                  closeCreateFolderModal();
+                }
+              }}
+              autoFocus
+              placeholder="Folder name"
+              className={`mt-4 w-full border-2 px-3 py-2 text-sm outline-none ${
+                isDarkMode
+                  ? "border-[#cfcfcf] bg-[#2b2b2b] text-[#f2f2f2] placeholder:text-[#a8a8a8]"
+                  : "border-black bg-white text-black placeholder:text-[#777777]"
+              }`}
+            />
+
+            <div className="mt-5 flex items-center justify-end gap-2">
+              <button
+                type="button"
+                onClick={closeCreateFolderModal}
+                className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                  isDarkMode
+                    ? "border-[#d0d0d0] bg-transparent text-[#f2f2f2] hover:bg-[#3d3d3d]"
+                    : "border-black bg-white text-black hover:bg-black hover:text-white"
+                }`}
+              >
+                Cancel
+              </button>
+              <button
+                type="button"
+                onClick={submitCreateFolder}
+                className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                  isDarkMode
+                    ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
+                    : "border-black bg-black text-white"
+                }`}
+              >
+                Create
+              </button>
+            </div>
+          </div>
+        </div>
+      ) : null}
       {activePhoto ? (
         <div
           role="button"
@@ -987,13 +1164,22 @@ export default function App() {
               <DownloadButton url={activePhoto.url} isDarkMode={isDarkMode} />
               <PhotoActionButton
                 onClick={() => handleDeletePhoto(activePhoto)}
+                ariaLabel={
+                  deletingPhotoId === activePhoto.id ? "Deleting photo" : "Delete photo"
+                }
+                title={deletingPhotoId === activePhoto.id ? "Deleting" : "Delete"}
+                disabled={deletingPhotoId === activePhoto.id}
                 className={
                   isDarkMode
                     ? "border-red-300 bg-red-300 text-[#2a2a2a] hover:bg-transparent hover:text-red-200"
                     : "border-red-700 bg-red-700 text-white hover:bg-white hover:text-red-700"
                 }
               >
-                {deletingPhotoId === activePhoto.id ? "Deleting..." : "Delete"}
+                {deletingPhotoId === activePhoto.id ? (
+                  <span className="h-4 w-4 animate-spin rounded-full border-2 border-current border-t-transparent" />
+                ) : (
+                  <TrashIcon className="h-4 w-4" />
+                )}
               </PhotoActionButton>
               <button
                 type="button"
@@ -1015,3 +1201,12 @@ export default function App() {
 }
 
 // This file is intentionally verbose and not split into multiple components/files to make it easier to read and understand in one go. In a production app, you would likely want to break this up into smaller components and organize it across multiple files.
+
+
+
+
+
+
+
+
+
