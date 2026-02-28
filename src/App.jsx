@@ -563,7 +563,8 @@ export default function App() {
       try {
         setLoading(true);
         setError("");
-        await fetchAllPhotos();
+        const response = await axios.get("http://localhost:8080/statuses");
+        setPhotos(normalizePhotos(response.data));
       } catch (err) {
         setError("Could not load photos. Please try again.");
       } finally {
