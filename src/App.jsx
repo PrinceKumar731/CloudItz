@@ -40,13 +40,14 @@ function normalizePhotos(payload) {
   return payload.flatMap((item) => {
     if (Array.isArray(item?.media_attachments)) {
       const createdAt = item.created_at || item.uploadedAt || "";
-      const folder = item.folder || "Uncategorized";
+      const folder = item.folder || "";
       return item.media_attachments
         .map((attachment) => toAttachment(attachment))
         .filter(Boolean)
         .filter((attachment) => !attachment.type || attachment.type === "image")
-        .map((attachment) => ({
-          id: String(attachment.id || crypto.randomUUID()),
+        .map((attachment, index) => ({
+          id: String(item.id ? `${item.id}-${index}` : crypto.randomUUID()),
+          statusId: String(item.id || attachment.id || ""),
           url: attachment.preview_url || attachment.url || "",
           uploadedAt: createdAt,
           folder,
@@ -58,16 +59,17 @@ function normalizePhotos(payload) {
     return [
       {
         id: String(item?.id || crypto.randomUUID()),
+        statusId: String(item?.id || ""),
         url: item?.url || item?.preview_url || "",
         uploadedAt: item?.uploadedAt || item?.created_at || "",
-        folder: item?.folder || "Uncategorized",
+        folder: item?.folder || "",
         size: item?.size || "N/A",
       },
     ].filter((photo) => photo.url);
   });
 }
 
-function DownloadButton({ url, className = "" }) {
+function DownloadButton({ url, className = "", isDarkMode = false }) {
   async function handleDownload(event) {
     event.stopPropagation();
     try {
@@ -96,7 +98,11 @@ function DownloadButton({ url, className = "" }) {
     <button
       type="button"
       onClick={handleDownload}
-      className={`border-2 border-black bg-black px-4 py-2 text-xs font-semibold uppercase tracking-wide text-white transition hover:bg-white hover:text-black ${className}`}
+      className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${
+        isDarkMode
+          ? "border-[#cfcfcf] bg-[#cfcfcf] text-[#2a2a2a] hover:bg-transparent hover:text-[#e9e9e9]"
+          : "border-black bg-black text-white hover:bg-white hover:text-black"
+      } ${className}`}
     >
       Download
     </button>
@@ -153,7 +159,86 @@ function ErrorAlert({ message }) {
   );
 }
 
-function PhotoCard({ photo, onClick }) {
+function SuccessAlert({ message }) {
+  if (!message) {
+    return null;
+  }
+
+  return (
+    <div
+      role="status"
+      className="mb-6 border-2 border-green-700 bg-green-50 px-4 py-3 text-green-900"
+    >
+      <div className="flex items-start gap-3">
+        <div className="mt-0.5 flex h-6 w-6 items-center justify-center rounded-full border-2 border-green-700 text-xs font-bold">
+          ✓
+        </div>
+        <div>
+          <p className="text-sm font-semibold uppercase tracking-wide">
+            Uploaded successfully
+          </p>
+          <p className="mt-1 text-sm">{message}</p>
+        </div>
+      </div>
+    </div>
+  );
+}
+
+function MoonIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <path
+        d="M20 14.5A8.5 8.5 0 1 1 9.5 4a7 7 0 1 0 10.5 10.5Z"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+        strokeLinejoin="round"
+      />
+    </svg>
+  );
+}
+
+function SunIcon({ className = "" }) {
+  return (
+    <svg viewBox="0 0 24 24" aria-hidden="true" className={className}>
+      <circle
+        cx="12"
+        cy="12"
+        r="4"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+      />
+      <path
+        d="M12 2.5V5M12 19v2.5M21.5 12H19M5 12H2.5M18.7 5.3l-1.8 1.8M7.1 16.9l-1.8 1.8M18.7 18.7l-1.8-1.8M7.1 7.1 5.3 5.3"
+        fill="none"
+        stroke="currentColor"
+        strokeWidth="1.8"
+        strokeLinecap="round"
+      />
+    </svg>
+  );
+}
+
+function PhotoActionButton({
+  children,
+  onClick,
+  className = "",
+  type = "button",
+}) {
+  return (
+    <button
+      type={type}
+      onClick={onClick}
+      className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide transition ${className}`}
+    >
+      {children}
+    </button>
+  );
+}
+
+function PhotoCard({ photo, onClick, onDelete, isDarkMode }) {
   return (
     <button
       type="button"
@@ -167,15 +252,27 @@ function PhotoCard({ photo, onClick }) {
         loading="lazy"
       />
       <div className="pointer-events-none absolute inset-0 bg-black opacity-0 transition group-hover:opacity-30" />
-      <DownloadButton
-        url={photo.url}
-        className="absolute bottom-4 right-4 opacity-0 transition group-hover:opacity-100"
-      />
+      <div className="absolute bottom-4 right-4 flex items-center gap-2 opacity-0 transition group-hover:opacity-100">
+        <DownloadButton url={photo.url} isDarkMode={isDarkMode} />
+        <PhotoActionButton
+          onClick={(event) => {
+            event.stopPropagation();
+            onDelete(photo);
+          }}
+          className={
+            isDarkMode
+              ? "border-red-300 bg-red-300 text-[#2a2a2a] hover:bg-transparent hover:text-red-200"
+              : "border-red-700 bg-red-700 text-white hover:bg-white hover:text-red-700"
+          }
+        >
+          Delete
+        </PhotoActionButton>
+      </div>
     </button>
   );
 }
 
-function PhotoGrid({ photos, emptyMessage, onPhotoClick }) {
+function PhotoGrid({ photos, emptyMessage, onPhotoClick, onDeletePhoto, isDarkMode }) {
   if (!photos.length) {
     return (
       <div className="border-2 border-black bg-white p-12 text-center text-[#555555]">
@@ -187,22 +284,32 @@ function PhotoGrid({ photos, emptyMessage, onPhotoClick }) {
   return (
     <section className="grid grid-cols-1 gap-6 sm:grid-cols-2 xl:grid-cols-3">
       {photos.map((photo) => (
-        <PhotoCard key={photo.id} photo={photo} onClick={onPhotoClick} />
+        <PhotoCard
+          key={photo.id}
+          photo={photo}
+          onClick={onPhotoClick}
+          onDelete={onDeletePhoto}
+          isDarkMode={isDarkMode}
+        />
       ))}
     </section>
   );
 }
 
-function FolderCard({ name, count, onClick }) {
+function FolderCard({ name, count, onClick, isDarkMode }) {
   return (
     <button
       onClick={onClick}
-      className="border-2 border-black bg-white p-6 text-left transition hover:bg-black hover:text-white"
+      className={`border-2 p-6 text-left transition ${
+        isDarkMode
+          ? "border-[#cfcfcf] bg-[#333333] text-[#f2f2f2] hover:bg-[#454545]"
+          : "border-black bg-white text-black hover:bg-black hover:text-white"
+      }`}
       type="button"
     >
       <div className="mb-4 h-12 w-12 rounded-full border-2 border-current" />
       <h3 className="text-lg font-semibold">{name}</h3>
-      <p className="mt-1 text-sm text-[#555555]">
+      <p className={`mt-1 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}>
         {count} photo{count !== 1 ? "s" : ""}
       </p>
       <div className="mt-4 border-t-2 border-current pt-3 text-sm">
@@ -217,26 +324,136 @@ function FolderCard({ name, count, onClick }) {
 
 export default function App() {
   const [photos, setPhotos] = useState([]);
+  const [folders, setFolders] = useState([]);
   const [activeTab, setActiveTab] = useState(TABS.ALL_PHOTOS);
   const [selectedFolder, setSelectedFolder] = useState(null);
+  const [selectedFolderPhotos, setSelectedFolderPhotos] = useState([]);
+  const [isDarkMode, setIsDarkMode] = useState(false);
   const [loading, setLoading] = useState(true);
   const [viewLoading, setViewLoading] = useState(false);
   const [error, setError] = useState("");
+  const [successMessage, setSuccessMessage] = useState("");
   const [activePhoto, setActivePhoto] = useState(null);
+  const [deletingPhotoId, setDeletingPhotoId] = useState("");
   const transitionTimeoutRef = useRef(null);
+  const successTimeoutRef = useRef(null);
+  const popStateRef = useRef(false);
   const fileInputRef = useRef(null);
+  const folderFileInputRef = useRef(null);
 
   useEffect(() => {
     return () => {
       if (transitionTimeoutRef.current) {
         clearTimeout(transitionTimeoutRef.current);
       }
+      if (successTimeoutRef.current) {
+        clearTimeout(successTimeoutRef.current);
+      }
     };
   }, []);
+
+  useEffect(() => {
+    const storedTheme = window.localStorage.getItem("theme");
+    if (storedTheme === "dark") {
+      setIsDarkMode(true);
+    }
+  }, []);
+
+  useEffect(() => {
+    window.localStorage.setItem("theme", isDarkMode ? "dark" : "light");
+  }, [isDarkMode]);
+
+  function showUploadSuccess(message) {
+    setSuccessMessage(message);
+    if (successTimeoutRef.current) {
+      clearTimeout(successTimeoutRef.current);
+    }
+    successTimeoutRef.current = setTimeout(() => {
+      setSuccessMessage("");
+    }, 3000);
+  }
 
   function handleUploadClick() {
     if (fileInputRef.current) {
       fileInputRef.current.click();
+    }
+  }
+
+  async function uploadFiles(files, endpoint) {
+    const imageFiles = files.filter((file) => file.type.startsWith("image/"));
+    if (!imageFiles.length) {
+      setError("Please select image files only.");
+      return;
+    }
+
+    for (const file of imageFiles) {
+      const formData = new FormData();
+      formData.append("file", file);
+      await axios.post(endpoint, formData);
+    }
+  }
+
+  async function fetchAllPhotos() {
+    const response = await axios.get("/statuses");
+    const normalized = normalizePhotos(response.data);
+    setPhotos(normalized);
+  }
+
+  async function fetchFolders() {
+    const response = await axios.get("/folder");
+    const folderNames = Array.isArray(response.data)
+      ? response.data
+          .map((item) => item?.folderName)
+          .filter((folderName) => typeof folderName === "string")
+      : [];
+    setFolders(Array.from(new Set(folderNames)));
+  }
+
+  async function fetchFolderPhotos(folderName) {
+    const encodedFolder = encodeURIComponent(folderName);
+    try {
+      const response = await axios.get(`/statuses/${encodedFolder}`);
+      const normalized = normalizePhotos(response.data).map((photo) => ({
+        ...photo,
+        folder: photo.folder || folderName,
+      }));
+      setSelectedFolderPhotos(normalized);
+    } catch (err) {
+      if (err?.response?.status === 404) {
+        setSelectedFolderPhotos([]);
+        return;
+      }
+      throw err;
+    }
+  }
+
+  async function handleDeletePhoto(photo) {
+    const statusId = photo?.statusId;
+    if (!statusId) {
+      setError("Could not delete this image because id is missing.");
+      return;
+    }
+
+    try {
+      setViewLoading(true);
+      setError("");
+      setSuccessMessage("");
+      setDeletingPhotoId(photo.id);
+      await axios.delete(`/delete/${encodeURIComponent(statusId)}`);
+      setActivePhoto(null);
+      await Promise.all([
+        fetchAllPhotos(),
+        fetchFolders(),
+        selectedFolder ? fetchFolderPhotos(selectedFolder) : Promise.resolve(),
+      ]);
+      showUploadSuccess("Image deleted successfully.");
+    } catch (err) {
+      const backendMessage =
+        err?.response?.data?.message || err?.response?.data?.error;
+      setError(backendMessage || "Delete failed. Please try again.");
+    } finally {
+      setDeletingPhotoId("");
+      setViewLoading(false);
     }
   }
 
@@ -246,62 +463,13 @@ export default function App() {
       return;
     }
 
-    async function uploadSingleFile(file) {
-      // const baseUrl = import.meta.env.VITE_API_URL;
-
-      const attempts = [
-        {
-          url: `https://proaristocratic-surgeonless-miya.ngrok-free.dev/api/upload`,
-          field: "file",
-        },
-        {
-          url: `https://proaristocratic-surgeonless-miya.ngrok-free.dev/api/upload`,
-          field: "files",
-        },
-        {
-          url: `https://proaristocratic-surgeonless-miya.ngrok-free.dev/upload`,
-          field: "file",
-        },
-        {
-          url: `https://proaristocratic-surgeonless-miya.ngrok-free.dev/upload`,
-          field: "files",
-        },
-      ];
-
-      let lastError = null;
-      for (const attempt of attempts) {
-        try {
-          const formData = new FormData();
-          formData.append(attempt.field, file);
-          // Let the browser/axios set multipart boundary automatically.
-          await axios.post(attempt.url, formData);
-          return;
-        } catch (err) {
-          lastError = err;
-        }
-      }
-
-      throw lastError;
-    }
-
     try {
       setViewLoading(true);
       setError("");
-
-      const imageFiles = files.filter((file) => file.type.startsWith("image/"));
-      if (!imageFiles.length) {
-        setError("Please select image files only.");
-        return;
-      }
-
-      for (const file of imageFiles) {
-        await uploadSingleFile(file);
-      }
-
-      const response = await axios.get(
-        "https://proaristocratic-surgeonless-miya.ngrok-free.dev/statuses",
-      );
-      setPhotos(normalizePhotos(response.data));
+      setSuccessMessage("");
+      await uploadFiles(files, "/api/upload");
+      await Promise.all([fetchAllPhotos(), fetchFolders()]);
+      showUploadSuccess("Your photos were uploaded.");
     } catch (err) {
       const backendMessage =
         err?.response?.data?.message || err?.response?.data?.error;
@@ -309,6 +477,72 @@ export default function App() {
     } finally {
       setViewLoading(false);
       event.target.value = "";
+    }
+  }
+
+  function handleFolderUploadClick() {
+    if (folderFileInputRef.current) {
+      folderFileInputRef.current.click();
+    }
+  }
+
+  async function handleFolderFileChange(event) {
+    const files = Array.from(event.target.files || []);
+    if (!files.length || !selectedFolder) {
+      return;
+    }
+
+    try {
+      setViewLoading(true);
+      setError("");
+      setSuccessMessage("");
+      const encodedFolder = encodeURIComponent(selectedFolder);
+      await uploadFiles(files, `/api/upload/${encodedFolder}`);
+      await Promise.all([
+        fetchAllPhotos(),
+        fetchFolderPhotos(selectedFolder),
+        fetchFolders(),
+      ]);
+      showUploadSuccess(`Uploaded to folder "${selectedFolder}".`);
+    } catch (err) {
+      const backendMessage =
+        err?.response?.data?.message || err?.response?.data?.error;
+      setError(backendMessage || "Upload failed. Please try again.");
+    } finally {
+      setViewLoading(false);
+      event.target.value = "";
+    }
+  }
+
+  function handleCreateFolder() {
+    const folderName = window.prompt("Enter new folder name:");
+    const trimmedName = folderName?.trim();
+
+    if (!trimmedName) {
+      return;
+    }
+
+    setFolders((previous) => {
+      if (previous.includes(trimmedName)) {
+        return previous;
+      }
+      return [...previous, trimmedName];
+    });
+  }
+
+  async function handleFoldersTabClick() {
+    try {
+      setViewLoading(true);
+      setError("");
+      setActiveTab(TABS.FOLDERS);
+      setSelectedFolder(null);
+      await fetchFolders();
+    } catch (err) {
+      const backendMessage =
+        err?.response?.data?.message || err?.response?.data?.error;
+      setError(backendMessage || "Could not load folders. Please try again.");
+    } finally {
+      setViewLoading(false);
     }
   }
 
@@ -329,8 +563,7 @@ export default function App() {
       try {
         setLoading(true);
         setError("");
-        const response = await axios.get("/statuses");
-        setPhotos(normalizePhotos(response.data));
+        await fetchAllPhotos();
       } catch (err) {
         setError("Could not load photos. Please try again.");
       } finally {
@@ -341,13 +574,84 @@ export default function App() {
     fetchPhotos();
   }, []);
 
+  useEffect(() => {
+    window.history.replaceState(
+      { tab: TABS.ALL_PHOTOS, folder: null },
+      "",
+    );
+  }, []);
+
+  useEffect(() => {
+    function handlePopState(event) {
+      const state = event.state || {};
+      const nextTab = state.tab || TABS.ALL_PHOTOS;
+      const nextFolder = state.folder || null;
+
+      popStateRef.current = true;
+      setActiveTab(nextTab);
+      setSelectedFolder(nextFolder);
+      setActivePhoto(null);
+
+      async function syncFromHistory() {
+        try {
+          if (nextTab === TABS.FOLDERS) {
+            await fetchFolders();
+            if (nextFolder) {
+              await fetchFolderPhotos(nextFolder);
+            } else {
+              setSelectedFolderPhotos([]);
+            }
+          }
+        } finally {
+          popStateRef.current = false;
+        }
+      }
+
+      syncFromHistory();
+    }
+
+    window.addEventListener("popstate", handlePopState);
+    return () => {
+      window.removeEventListener("popstate", handlePopState);
+    };
+  }, []);
+
+  useEffect(() => {
+    if (popStateRef.current) {
+      return;
+    }
+    const currentState = window.history.state || {};
+    const nextState = {
+      tab: activeTab,
+      folder: selectedFolder || null,
+    };
+
+    if (
+      currentState.tab === nextState.tab &&
+      currentState.folder === nextState.folder
+    ) {
+      return;
+    }
+
+    window.history.pushState(nextState, "");
+  }, [activeTab, selectedFolder]);
+
   const folderCounts = useMemo(() => {
-    return photos.reduce((acc, photo) => {
-      const folderName = photo.folder || "Uncategorized";
+    const counts = photos.reduce((acc, photo) => {
+      const folderName = typeof photo.folder === "string" ? photo.folder.trim() : "";
+      if (!folderName) {
+        return acc;
+      }
       acc[folderName] = (acc[folderName] || 0) + 1;
       return acc;
     }, {});
-  }, [photos]);
+    folders.forEach((folderName) => {
+      if (!(folderName in counts)) {
+        counts[folderName] = 0;
+      }
+    });
+    return counts;
+  }, [photos, folders]);
 
   const filteredAllPhotos = useMemo(() => photos, [photos]);
 
@@ -356,10 +660,8 @@ export default function App() {
       return [];
     }
 
-    return photos.filter(
-      (photo) => (photo.folder || "Uncategorized") === selectedFolder,
-    );
-  }, [photos, selectedFolder]);
+    return selectedFolderPhotos;
+  }, [selectedFolder, selectedFolderPhotos]);
 
   const isBusy = loading || viewLoading;
   const currentVisiblePhotos =
@@ -388,11 +690,38 @@ export default function App() {
   }
 
   return (
-    <div className="min-h-screen bg-[#f5f5f5] text-black">
-      <header className="w-full border-b-2 border-black bg-[#f5f5f5]">
+    <div
+      className={`min-h-screen transition-colors ${
+        isDarkMode ? "bg-[#2b2b2b] text-[#f2f2f2]" : "bg-[#f5f5f5] text-black"
+      }`}
+    >
+      <header
+        className={`w-full border-b-2 transition-colors ${
+          isDarkMode
+            ? "border-[#cfcfcf] bg-[#2b2b2b]"
+            : "border-black bg-[#f5f5f5]"
+        }`}
+      >
         <div className="mx-auto flex w-full max-w-7xl items-center justify-between px-6 py-5">
           <h1 className="text-4xl font-black tracking-tight">CloudIt</h1>
           <div className="flex items-center gap-3">
+            <button
+              type="button"
+              onClick={() => setIsDarkMode((previous) => !previous)}
+              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              className={`rounded-full border-2 p-2 transition ${
+                isDarkMode
+                  ? "border-[#d9d9d9] text-[#ffd86f] hover:bg-[#3b3b3b]"
+                  : "border-black text-black hover:bg-[#ececec]"
+              }`}
+            >
+              {isDarkMode ? (
+                <SunIcon className="h-5 w-5" />
+              ) : (
+                <MoonIcon className="h-5 w-5" />
+              )}
+            </button>
             <input
               ref={fileInputRef}
               type="file"
@@ -404,7 +733,11 @@ export default function App() {
             <button
               type="button"
               onClick={handleUploadClick}
-              className="border-2 border-black bg-black px-6 py-3 text-sm font-semibold uppercase tracking-wide text-white"
+              className={`border-2 px-6 py-3 text-sm font-semibold uppercase tracking-wide ${
+                isDarkMode
+                  ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
+                  : "border-black bg-black text-white"
+              }`}
             >
               Upload
             </button>
@@ -413,7 +746,11 @@ export default function App() {
       </header>
 
       <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14">
-        <section className="border-2 border-black bg-white p-6 sm:p-8">
+        <section
+          className={`border-2 p-6 transition-colors sm:p-8 ${
+            isDarkMode ? "border-[#cfcfcf] bg-[#303030]" : "border-black bg-white"
+          }`}
+        >
           <div className="mb-8 flex justify-center">
             <nav className="flex flex-wrap items-center justify-center gap-3">
               <button
@@ -426,8 +763,12 @@ export default function App() {
                 }}
                 className={`border-2 border-black px-5 py-2 text-sm font-semibold uppercase tracking-wide transition ${
                   activeTab === TABS.ALL_PHOTOS
-                    ? "bg-black text-white"
-                    : "bg-white text-black"
+                    ? isDarkMode
+                      ? "border-[#d6d6d6] bg-[#d6d6d6] text-[#2b2b2b]"
+                      : "bg-black text-white"
+                    : isDarkMode
+                      ? "border-[#d6d6d6] bg-[#3d3d3d] text-[#f2f2f2]"
+                      : "bg-white text-black"
                 }`}
               >
                 All Photos
@@ -435,14 +776,16 @@ export default function App() {
               <button
                 type="button"
                 onClick={() => {
-                  withViewTransition(() => {
-                    setActiveTab(TABS.FOLDERS);
-                  });
+                  handleFoldersTabClick();
                 }}
                 className={`border-2 border-black px-5 py-2 text-sm font-semibold uppercase tracking-wide transition ${
                   activeTab === TABS.FOLDERS
-                    ? "bg-black text-white"
-                    : "bg-white text-black"
+                    ? isDarkMode
+                      ? "border-[#d6d6d6] bg-[#d6d6d6] text-[#2b2b2b]"
+                      : "bg-black text-white"
+                    : isDarkMode
+                      ? "border-[#d6d6d6] bg-[#3d3d3d] text-[#f2f2f2]"
+                      : "bg-white text-black"
                 }`}
               >
                 Folders
@@ -451,6 +794,7 @@ export default function App() {
           </div>
 
           <ErrorAlert message={error} />
+          <SuccessAlert message={successMessage} />
           {isBusy ? <ViewLoader /> : null}
 
           {!isBusy && !error && activeTab === TABS.ALL_PHOTOS ? (
@@ -458,6 +802,8 @@ export default function App() {
               photos={filteredAllPhotos}
               emptyMessage="No photos found."
               onPhotoClick={setActivePhoto}
+              onDeletePhoto={handleDeletePhoto}
+              isDarkMode={isDarkMode}
             />
           ) : null}
 
@@ -475,21 +821,63 @@ export default function App() {
                         setSelectedFolder(null);
                       });
                     }}
-                    className="border-2 border-black bg-black px-4 py-2 text-sm font-semibold uppercase tracking-wide text-white"
+                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                      isDarkMode
+                        ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
+                        : "border-black bg-black text-white"
+                    }`}
                   >
                     Back to Folders
                   </button>
                 </div>
               ) : (
-                <h2 className="text-4xl font-semibold">Featured Collections</h2>
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                  <h2 className="text-4xl font-semibold">Featured Collections</h2>
+                  <button
+                    type="button"
+                    onClick={handleCreateFolder}
+                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                      isDarkMode
+                        ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
+                        : "border-black bg-black text-white"
+                    }`}
+                  >
+                    New Folder
+                  </button>
+                </div>
               )}
 
               {selectedFolder ? (
-                <PhotoGrid
-                  photos={filteredFolderPhotos}
-                  emptyMessage="No photos found in this folder."
-                  onPhotoClick={setActivePhoto}
-                />
+                <div className="space-y-4">
+                  <div>
+                    <input
+                      ref={folderFileInputRef}
+                      type="file"
+                      accept="image/*"
+                      multiple
+                      onChange={handleFolderFileChange}
+                      className="hidden"
+                    />
+                    <button
+                      type="button"
+                      onClick={handleFolderUploadClick}
+                      className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                        isDarkMode
+                          ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
+                          : "border-black bg-black text-white"
+                      }`}
+                    >
+                      Upload To Folder
+                    </button>
+                  </div>
+                  <PhotoGrid
+                    photos={filteredFolderPhotos}
+                    emptyMessage="No photos found in this folder."
+                    onPhotoClick={setActivePhoto}
+                    onDeletePhoto={handleDeletePhoto}
+                    isDarkMode={isDarkMode}
+                  />
+                </div>
               ) : (
                 <section className="grid grid-cols-1 gap-5 md:grid-cols-2 xl:grid-cols-3">
                   {Object.entries(folderCounts).map(([name, count]) => (
@@ -497,10 +885,24 @@ export default function App() {
                       key={name}
                       name={name}
                       count={count}
-                      onClick={() => {
-                        withViewTransition(() => {
+                      isDarkMode={isDarkMode}
+                      onClick={async () => {
+                        try {
+                          setViewLoading(true);
+                          setError("");
+                          await fetchFolderPhotos(name);
                           setSelectedFolder(name);
-                        });
+                        } catch (err) {
+                          const backendMessage =
+                            err?.response?.data?.message ||
+                            err?.response?.data?.error;
+                          setError(
+                            backendMessage ||
+                              "Could not load this folder. Please try again.",
+                          );
+                        } finally {
+                          setViewLoading(false);
+                        }
                       }}
                     />
                   ))}
@@ -527,17 +929,25 @@ export default function App() {
               showNextPhoto();
             }
           }}
-          className="fixed inset-0 z-40 flex items-center justify-center bg-black/80 px-4 py-8"
+          className="fixed inset-0 z-40 flex items-center justify-center bg-black/75 px-4 py-8"
         >
           <div
-            className="relative w-full max-w-4xl overflow-hidden border-2 border-black bg-white p-3"
+            className={`relative w-full max-w-4xl overflow-hidden border-2 p-3 ${
+              isDarkMode
+                ? "border-[#cfcfcf] bg-[#343434]"
+                : "border-black bg-white"
+            }`}
             onClick={(event) => event.stopPropagation()}
           >
             <button
               type="button"
               onClick={showPreviousPhoto}
               disabled={activePhotoIndex <= 0}
-              className="absolute left-4 top-1/2 z-10 -translate-y-1/2 border-2 border-black bg-white px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+              className={`absolute left-4 top-1/2 z-10 -translate-y-1/2 border-2 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                isDarkMode
+                  ? "border-[#d0d0d0] bg-[#4a4a4a] text-[#f2f2f2]"
+                  : "border-black bg-white"
+              }`}
             >
               Prev
             </button>
@@ -546,7 +956,11 @@ export default function App() {
               type="button"
               onClick={showNextPhoto}
               disabled={activePhotoIndex >= currentVisiblePhotos.length - 1}
-              className="absolute right-4 top-1/2 z-10 -translate-y-1/2 border-2 border-black bg-white px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40"
+              className={`absolute right-4 top-1/2 z-10 -translate-y-1/2 border-2 px-3 py-2 text-sm font-semibold disabled:cursor-not-allowed disabled:opacity-40 ${
+                isDarkMode
+                  ? "border-[#d0d0d0] bg-[#4a4a4a] text-[#f2f2f2]"
+                  : "border-black bg-white"
+              }`}
             >
               Next
             </button>
@@ -557,11 +971,25 @@ export default function App() {
               className="max-h-[78vh] w-full object-contain"
             />
             <div className="absolute bottom-6 right-6 flex items-center gap-3">
-              <DownloadButton url={activePhoto.url} />
+              <DownloadButton url={activePhoto.url} isDarkMode={isDarkMode} />
+              <PhotoActionButton
+                onClick={() => handleDeletePhoto(activePhoto)}
+                className={
+                  isDarkMode
+                    ? "border-red-300 bg-red-300 text-[#2a2a2a] hover:bg-transparent hover:text-red-200"
+                    : "border-red-700 bg-red-700 text-white hover:bg-white hover:text-red-700"
+                }
+              >
+                {deletingPhotoId === activePhoto.id ? "Deleting..." : "Delete"}
+              </PhotoActionButton>
               <button
                 type="button"
                 onClick={() => setActivePhoto(null)}
-                className="border-2 border-black bg-white px-4 py-2 text-xs font-semibold uppercase tracking-wide text-black"
+                className={`border-2 px-4 py-2 text-xs font-semibold uppercase tracking-wide ${
+                  isDarkMode
+                    ? "border-[#d0d0d0] bg-[#4a4a4a] text-[#f2f2f2]"
+                    : "border-black bg-white text-black"
+                }`}
               >
                 Close
               </button>

@@ -9,7 +9,15 @@ export default defineConfig({
         target: "http://localhost:8080",
         changeOrigin: true
       },
+      "/folder": {
+        target: "http://localhost:8080",
+        changeOrigin: true
+      },
       "/upload": {
+        target: "http://localhost:8080",
+        changeOrigin: true
+      },
+      "/delete": {
         target: "http://localhost:8080",
         changeOrigin: true
       },
