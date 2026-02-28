@@ -6,6 +6,18 @@ const TABS = {
   FOLDERS: "folders",
 };
 
+const API_BASE_URL = (import.meta.env.VITE_API_URL || "").replace(/\/+$/, "");
+const shouldSendNgrokBypassHeader = API_BASE_URL.includes("ngrok");
+
+if (API_BASE_URL) {
+  axios.defaults.baseURL = API_BASE_URL;
+}
+
+if (shouldSendNgrokBypassHeader) {
+  axios.defaults.headers.common["ngrok-skip-browser-warning"] = "true";
+}
+
+
 function normalizePhotos(payload) {
   if (!Array.isArray(payload)) {
     return [];
@@ -563,7 +575,7 @@ export default function App() {
       try {
         setLoading(true);
         setError("");
-        const response = await axios.get("http://localhost:8080/statuses");
+        const response = await axios.get("/statuses");
         setPhotos(normalizePhotos(response.data));
       } catch (err) {
         setError("Could not load photos. Please try again.");
