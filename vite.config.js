@@ -6,25 +6,25 @@ export default defineConfig({
   server: {
     proxy: {
       "/statuses": {
-        target: "http://localhost:8080",
-        changeOrigin: true
+        target: "https://cloudit-m0tx.onrender.com/",
+        changeOrigin: true,
       },
       "/folder": {
-        target: "http://localhost:8080",
-        changeOrigin: true
+        target: "https://cloudit-m0tx.onrender.com/",
+        changeOrigin: true,
       },
       "/upload": {
-        target: "http://localhost:8080",
-        changeOrigin: true
+        target: "https://cloudit-m0tx.onrender.com/",
+        changeOrigin: true,
       },
       "/delete": {
-        target: "http://localhost:8080",
-        changeOrigin: true
+        target: "https://cloudit-m0tx.onrender.com/",
+        changeOrigin: true,
       },
       "/api": {
-        target: "http://localhost:8080",
-        changeOrigin: true
-      }
-    }
-  }
+        target: "https://cloudit-m0tx.onrender.com/",
+        changeOrigin: true,
+      },
+    },
+  },
 });

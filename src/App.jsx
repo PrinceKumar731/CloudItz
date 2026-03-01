@@ -17,7 +17,6 @@ if (shouldSendNgrokBypassHeader) {
   axios.defaults.headers.common["ngrok-skip-browser-warning"] = "true";
 }
 
-
 function normalizePhotos(payload) {
   if (!Array.isArray(payload)) {
     return [];
@@ -324,7 +323,13 @@ function PhotoCard({ photo, onClick, onDelete, isDarkMode }) {
   );
 }
 
-function PhotoGrid({ photos, emptyMessage, onPhotoClick, onDeletePhoto, isDarkMode }) {
+function PhotoGrid({
+  photos,
+  emptyMessage,
+  onPhotoClick,
+  onDeletePhoto,
+  isDarkMode,
+}) {
   if (!photos.length) {
     return (
       <div className="border-2 border-black bg-white p-12 text-center text-[#555555]">
@@ -366,7 +371,9 @@ function FolderCard({ name, count, onClick, isDarkMode }) {
         {randomSymbol}
       </div>
       <h3 className="text-lg font-semibold">{name}</h3>
-      <p className={`mt-1 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}>
+      <p
+        className={`mt-1 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}
+      >
         {count} photo{count !== 1 ? "s" : ""}
       </p>
       <div className="mt-4 border-t-2 border-current pt-3 text-sm">
@@ -484,7 +491,11 @@ export default function App() {
     if (Array.isArray(response.data)) {
       response.data.forEach((item) => {
         const rawName =
-          typeof item === "string" ? item : typeof item?.folderName === "string" ? item.folderName : "";
+          typeof item === "string"
+            ? item
+            : typeof item?.folderName === "string"
+              ? item.folderName
+              : "";
         const folderName = rawName.trim();
 
         if (!folderName) {
@@ -502,7 +513,9 @@ export default function App() {
       });
     }
 
-    setFolders((previous) => Array.from(new Set([...previous, ...folderNames])));
+    setFolders((previous) =>
+      Array.from(new Set([...previous, ...folderNames])),
+    );
     setFolderPhotoCounts((previous) => {
       const merged = { ...previous, ...nextCounts };
       folderNames.forEach((name) => {
@@ -602,7 +615,10 @@ export default function App() {
       setError("");
       setSuccessMessage("");
       const encodedFolder = encodeURIComponent(selectedFolder);
-      await uploadFiles(files, [`/api/upload/${encodedFolder}`, `/upload/${encodedFolder}`]);
+      await uploadFiles(files, [
+        `/api/upload/${encodedFolder}`,
+        `/upload/${encodedFolder}`,
+      ]);
       await Promise.all([
         fetchAllPhotos(),
         fetchFolderPhotos(selectedFolder),
@@ -702,10 +718,7 @@ export default function App() {
   }, []);
 
   useEffect(() => {
-    window.history.replaceState(
-      { tab: TABS.ALL_PHOTOS, folder: null },
-      "",
-    );
+    window.history.replaceState({ tab: TABS.ALL_PHOTOS, folder: null }, "");
   }, []);
 
   useEffect(() => {
@@ -766,7 +779,8 @@ export default function App() {
   const folderCounts = useMemo(() => {
     const counts = { ...folderPhotoCounts };
     photos.forEach((photo) => {
-      const folderName = typeof photo.folder === "string" ? photo.folder.trim() : "";
+      const folderName =
+        typeof photo.folder === "string" ? photo.folder.trim() : "";
       if (!folderName || folderName in counts) {
         return;
       }
@@ -835,8 +849,12 @@ export default function App() {
             <button
               type="button"
               onClick={() => setIsDarkMode((previous) => !previous)}
-              aria-label={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
-              title={isDarkMode ? "Switch to light mode" : "Switch to dark mode"}
+              aria-label={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
+              title={
+                isDarkMode ? "Switch to light mode" : "Switch to dark mode"
+              }
               className={`rounded-full border-2 p-2 transition ${
                 isDarkMode
                   ? "border-[#d9d9d9] text-[#ffd86f] hover:bg-[#3b3b3b]"
@@ -875,7 +893,9 @@ export default function App() {
       <main className="mx-auto w-full max-w-7xl px-6 py-10 sm:py-14">
         <section
           className={`border-2 p-6 transition-colors sm:p-8 ${
-            isDarkMode ? "border-[#cfcfcf] bg-[#303030]" : "border-black bg-white"
+            isDarkMode
+              ? "border-[#cfcfcf] bg-[#303030]"
+              : "border-black bg-white"
           }`}
         >
           <div className="mb-8 flex justify-center">
@@ -948,7 +968,7 @@ export default function App() {
                         setSelectedFolder(null);
                       });
                     }}
-                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                       isDarkMode
                         ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                         : "border-black bg-black text-white"
@@ -959,11 +979,13 @@ export default function App() {
                 </div>
               ) : (
                 <div className="flex flex-wrap items-center justify-between gap-3">
-                  <h2 className="text-4xl font-semibold">Featured Collections</h2>
+                  <h2 className="text-4xl font-semibold">
+                    Featured Collections
+                  </h2>
                   <button
                     type="button"
                     onClick={handleCreateFolder}
-                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                    className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                       isDarkMode
                         ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                         : "border-black bg-black text-white"
@@ -988,7 +1010,7 @@ export default function App() {
                     <button
                       type="button"
                       onClick={handleFolderUploadClick}
-                className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
+                      className={`border-2 px-4 py-2 text-sm font-semibold uppercase tracking-wide ${
                         isDarkMode
                           ? "border-[#d0d0d0] bg-[#d0d0d0] text-[#2b2b2b] hover:bg-transparent hover:text-[#f2f2f2]"
                           : "border-black bg-black text-white"
@@ -1038,7 +1060,8 @@ export default function App() {
             </div>
           ) : null}
         </section>
-      </main>
+      </main>
+
       {isCreateFolderModalOpen ? (
         <div
           className="fixed inset-0 z-40 flex items-center justify-center bg-black/60 px-4"
@@ -1046,12 +1069,16 @@ export default function App() {
         >
           <div
             className={`w-full max-w-md border-2 p-6 ${
-              isDarkMode ? "border-[#cfcfcf] bg-[#333333] text-[#f2f2f2]" : "border-black bg-white text-black"
+              isDarkMode
+                ? "border-[#cfcfcf] bg-[#333333] text-[#f2f2f2]"
+                : "border-black bg-white text-black"
             }`}
             onClick={(event) => event.stopPropagation()}
           >
             <h3 className="text-xl font-semibold">Create New Folder</h3>
-            <p className={`mt-2 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}>
+            <p
+              className={`mt-2 text-sm ${isDarkMode ? "text-[#d8d8d8]" : "text-[#555555]"}`}
+            >
               Enter a folder name to continue.
             </p>
 
@@ -1165,9 +1192,13 @@ export default function App() {
               <PhotoActionButton
                 onClick={() => handleDeletePhoto(activePhoto)}
                 ariaLabel={
-                  deletingPhotoId === activePhoto.id ? "Deleting photo" : "Delete photo"
+                  deletingPhotoId === activePhoto.id
+                    ? "Deleting photo"
+                    : "Delete photo"
                 }
-                title={deletingPhotoId === activePhoto.id ? "Deleting" : "Delete"}
+                title={
+                  deletingPhotoId === activePhoto.id ? "Deleting" : "Delete"
+                }
                 disabled={deletingPhotoId === activePhoto.id}
                 className={
                   isDarkMode
@@ -1199,14 +1230,3 @@ export default function App() {
     </div>
   );
 }
-
-// This file is intentionally verbose and not split into multiple components/files to make it easier to read and understand in one go. In a production app, you would likely want to break this up into smaller components and organize it across multiple files.
-
-
-
-
-
-
-
-
-
